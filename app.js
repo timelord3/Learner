@@ -6,6 +6,7 @@ const endTimeInputEl = document.getElementById("end-time");
 
 // Listen to form submissions.
 newSessionFormEl.addEventListener("submit", (event) => {
+        console.log('You have clicked on the button.') 
   // Prevent the form from submitting to the server
   // since everything is client-side.
   event.preventDefault();
