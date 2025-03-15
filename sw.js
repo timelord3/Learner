@@ -46,24 +46,43 @@ self.addEventListener("activate", (event) => {
 // On fetch, intercept server requests
 // and respond with cached responses instead of going to network
 self.addEventListener("fetch", (event) => {
-  // As a single page app, direct app to always go to cached home page.
-  if (event.request.mode === "navigate") {  // Looking for a web page
-    event.respondWith(caches.match("/"));
-    return;
-  }
-
-  // For all other requests, go to the cache first, and then the network.
   event.respondWith(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const cachedResponse = await cache.match(event.request.url);
-      if (cachedResponse) {
-        // Return the cached response if it's available.
-        return cachedResponse;
+    caches.match(event.request).then(response => {
+      // If we have a cached response, return it
+      if (response) {
+        return response;
       }
-      // If resource isn't in the cache, return a 404.
-      return new Response(null, { status: 404 });
-    })(),
+
+      // Otherwise, fetch the resource from the network
+      return fetch(event.request).then(networkResponse => {
+        // Check if the response is valid
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
+        }
+
+        // Clone the response
+        const responseToCache = networkResponse.clone();
+
+        // Open the cache and put the cloned response in it
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, responseToCache);
+        });
+
+        return networkResponse;
+      }).catch(() => {
+        // Handle fetch errors
+        return new Response('Network error occurred', {
+          status: 408,
+          statusText: 'Network error'
+        });
+      });
+    }).catch(() => {
+      // Handle 404 errors
+      return new Response('Resource not found', {
+        status: 404,
+        statusText: 'Not Found'
+      });
+    })
   );
 });
 
