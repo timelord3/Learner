@@ -35,8 +35,17 @@ newSessionFormEl.addEventListener("submit", (event) => {
     return;
   }
 
-  // Store the new session in our client-side storage.
-  storeNewSession(date, startTime, endTime);
+  // Check if the form is in edit mode
+  const editIndex = newSessionFormEl.getAttribute("data-edit-index");
+  if (editIndex !== null) {
+    // Update the existing session
+    updateSession(editIndex, date, startTime, endTime);
+    // Remove the edit mode attribute
+    newSessionFormEl.removeAttribute("data-edit-index");
+  } else {
+    // Store the new session
+    storeNewSession(date, startTime, endTime);
+  }
 
   // Refresh the UI.
   renderPastSessions();
@@ -75,7 +84,7 @@ function storeNewSession(date, startTime, endTime) {
   const sessions = getAllStoredSessions();
 
   // Add the new session object to the end of the array of session objects.
-  sessions.push({ date, startTime, endTime });
+  sessions.push({ date, startTime, endTime,});
 
   // Sort the array so that sessions are ordered by date, from newest
   // to oldest.
@@ -116,16 +125,55 @@ function renderPastSessions() {
   const pastSessionList = document.createElement("ul");
 
   // Loop over all sessions and render them.
-  sessions.forEach((session) => {
+  sessions.forEach((session, index) => {
     const sessionEl = document.createElement("li");
     sessionEl.textContent = `${formatDate(session.date)} from ${formatTime(
       session.startTime,
-    )} to ${formatTime(session.endTime)}`;
+    )} to ${formatTime(session.endTime)} `;
+
+    // Create an edit button for each session
+    const editButton = document.createElement("button");
+    editButton.textContent = "Edit";
+    editButton.addEventListener("click", () => {
+      editSession(index);
+    });
+
+    sessionEl.appendChild(editButton);
     pastSessionList.appendChild(sessionEl);
   });
 
   pastSessionContainer.appendChild(pastSessionHeader);
   pastSessionContainer.appendChild(pastSessionList);
+}
+
+function editSession(index) {
+  // Get all sessions
+  const sessions = getAllStoredSessions();
+
+  // Get the session to edit
+  const session = sessions[index];
+
+  // Populate the form with session data
+  dateInputEl.value = session.date;
+  startTimeInputEl.value = session.startTime;
+  endTimeInputEl.value = session.endTime;
+
+  // Set a data attribute on the form to indicate edit mode
+  newSessionFormEl.setAttribute("data-edit-index", index);
+}
+
+function updateSession(index, date, startTime, endTime) {
+  // Get all sessions
+  const sessions = getAllStoredSessions();
+
+  // Update the session data
+  sessions[index] = { date, startTime, endTime };
+
+  // Store the updated array back in the storage
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+
+  // Refresh the UI
+  renderPastSessions();
 }
 
 function formatDate(dateString) {
