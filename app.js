@@ -6,9 +6,14 @@ const endTimeInputEl = document.getElementById("end-time");
 const STORAGE_KEY = "learner-hours";
 const pastSessionContainer = document.getElementById("past-sessions");
 
-
-
-
+// Create a search input element
+const searchInputEl = document.createElement("input");
+searchInputEl.setAttribute("type", "text");
+searchInputEl.setAttribute("placeholder", "Search by date (Y/M/D)");
+searchInputEl.addEventListener("input", () => {
+  searchSessions(searchInputEl.value);
+});
+document.body.insertBefore(searchInputEl, pastSessionContainer);
 
 // Listen to form submissions.
 newSessionFormEl.addEventListener("submit", (event) => {
@@ -25,13 +30,14 @@ newSessionFormEl.addEventListener("submit", (event) => {
   // Check if the date is invalid
   if (checkDateInvalid(date)) {
     // If the date is invalid, exit.
+    alert("Please enter a valid date.");
     return;
   }
 
   // Check if the times are invalid
   if (checkTimesInvalid(startTime, endTime)) {
     // If the times are invalid, exit.
-    
+    alert("Please ensure the start time is before the end time and both times are filled.");
     return;
   }
 
@@ -42,9 +48,16 @@ newSessionFormEl.addEventListener("submit", (event) => {
     updateSession(editIndex, date, startTime, endTime);
     // Remove the edit mode attribute
     newSessionFormEl.removeAttribute("data-edit-index");
+    alert("Entry successfully updated!");
   } else {
-    // Store the new session
+    // Check for duplicate session
+    if (isDuplicateSession(date, startTime, endTime)) {
+      alert("This session already exists. Please enter a different session.");
+      return;
+    }
+    // Storee the new session
     storeNewSession(date, startTime, endTime);
+    alert("Entry successfully saved!");
   }
 
   // Refresh the UI.
@@ -176,6 +189,15 @@ function updateSession(index, date, startTime, endTime) {
   renderPastSessions();
 }
 
+function isDuplicateSession(date, startTime, endTime) {
+  const sessions = getAllStoredSessions();
+  return sessions.some(session => 
+    session.date === date && 
+    session.startTime === startTime && 
+    session.endTime === endTime
+  );
+}
+
 function formatDate(dateString) {
  
   // Convert the date string to a Date object.
@@ -213,8 +235,54 @@ function formatTime(timeString) {
   return formattedTime;
 }
 
+function searchSessions(searchTerm) {
+  // Convert search term to the format used in stored sessions (YYYY-MM-DD)
+  const formattedSearchTerm = searchTerm.replace(/\//g, '-');
+
+  // Get all sessions
+  const sessions = getAllStoredSessions();
+
+  // Filter sessions based on the search term
+  const filteredSessions = sessions.filter(session => session.date.includes(formattedSearchTerm));
+
+  // Clear the list of pst sessions
+  pastSessionContainer.textContent = "";
+
+  if (filteredSessions.length === 0) {
+    const noResultsEl = document.createElement("p");
+    noResultsEl.textContent = "No sessions found.";
+    pastSessionContainer.appendChild(noResultsEl);
+    return;
+  }
+
+  const pastSessionHeader = document.createElement("h2");
+  pastSessionHeader.textContent = "Search results";
+
+  const pastSessionList = document.createElement("ul");
+
+  // Loop over all filttered sessions and render them.
+  filteredSessions.forEach((session, index) => {
+    const sessionEl = document.createElement("li");
+    sessionEl.textContent = `${formatDate(session.date)} from ${formatTime(
+      session.startTime,
+    )} to ${formatTime(session.endTime)} `;
+
+    // create an edit button for each session
+    const editButton = document.createElement("button");
+    editButton.textContent = "Edit";
+    editButton.addEventListener("click", () => {
+      editSession(index);
+    });
+
+    sessionEl.appendChild(editButton);
+    pastSessionList.appendChild(sessionEl);
+  });
+
+  pastSessionContainer.appendChild(pastSessionHeader);
+  pastSessionContainer.appendChild(pastSessionList);
+}
 
 renderPastSessions();
-  
- 
+
+
 
