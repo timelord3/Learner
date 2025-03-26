@@ -26,13 +26,22 @@
             <label for="end-time">End time</label>
             <input type="time" id="end-time" required />
           </p>
+          <p>
+            <button type="submit">Confirm</button>
+          </p>
+          <p id="error-message" style="color:red; display:none;"></p>
+          <p id="success-message" style="color:green; display:none;"></p>
         </div>
       </fieldset>
-      <p>
-        <button type="submit">Add Session</button>
-      </p>
     </form>
+    <hr/>
+    
+     <input type="text" id="search-input" placeholder="Search by date (Y/M/D)" style="float: right;" />
+    <p id="total-time" ></p>
+    <h2>Past sessions</h2>
     <section id="past-sessions"></section>
+
+
     <script src="app.js" defer></script>
 
     <!-- Register the app's service worker. -->

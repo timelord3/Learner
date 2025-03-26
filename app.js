@@ -3,24 +3,25 @@ const newSessionFormEl = document.getElementsByTagName("form")[0];
 const dateInputEl = document.getElementById("date");
 const startTimeInputEl = document.getElementById("start-time");
 const endTimeInputEl = document.getElementById("end-time");
+const errorMessage = document.getElementById('error-message');
+const successMessage = document.getElementById('success-message');
 const STORAGE_KEY = "learner-hours";
 const pastSessionContainer = document.getElementById("past-sessions");
+const searchInputEl = document.getElementById("search-input"); // Get the search input element from the HTML
+const totalTimeEl = document.getElementById("total-time"); // Get the total time element from the HTML
 
-// Create a search input element
-const searchInputEl = document.createElement("input");
-searchInputEl.setAttribute("type", "text");
-searchInputEl.setAttribute("placeholder", "Search by date (Y/M/D)");
+// Add event listener to the search input element
 searchInputEl.addEventListener("input", () => {
   searchSessions(searchInputEl.value);
 });
-document.body.insertBefore(searchInputEl, pastSessionContainer);
 
 // Listen to form submissions.
 newSessionFormEl.addEventListener("submit", (event) => {
-  // console.log('You have clicked on the button.')
-  // Prevent the form from submitting to the server
-  // since everything is client-side.
+
   event.preventDefault();
+
+  // Reset messages
+  resetMessages();
 
   // Get the start and end dates from the form.
   const date = dateInputEl.value;
@@ -29,15 +30,15 @@ newSessionFormEl.addEventListener("submit", (event) => {
 
   // Check if the date is invalid
   if (checkDateInvalid(date)) {
-    // If the date is invalid, exit.
-    alert("Please enter a valid date.");
+    // If the date is invalid, display a message.
+    displayErrorMessage("Please enter a valid date.");
     return;
   }
 
   // Check if the times are invalid
   if (checkTimesInvalid(startTime, endTime)) {
-    // If the times are invalid, exit.
-    alert("Please ensure the start time is before the end time and both times are filled.");
+    // If the times are invalid, display a message.
+    displayErrorMessage("Please ensure the start time is before the end time and both times are filled.");
     return;
   }
 
@@ -48,24 +49,46 @@ newSessionFormEl.addEventListener("submit", (event) => {
     updateSession(editIndex, date, startTime, endTime);
     // Remove the edit mode attribute
     newSessionFormEl.removeAttribute("data-edit-index");
-    alert("Entry successfully updated!");
+    displaySuccessMessage("Entry successfully updated!");
   } else {
     // Check for duplicate session
     if (isDuplicateSession(date, startTime, endTime)) {
-      alert("This session already exists. Please enter a different session.");
+      displayErrorMessage("This session already exists. Please enter a different session.");
       return;
     }
-    // Storee the new session
+    // Store the new session
     storeNewSession(date, startTime, endTime);
-    alert("Entry successfully saved!");
+    displaySuccessMessage("Entry successfully saved!");
   }
 
   // Refresh the UI.
   renderPastSessions();
+  calculateTotalTime();
 
   // Reset the form.
   newSessionFormEl.reset();
+  errorMessage.style.display = 'none';
 });
+
+// Function to reset messages
+function resetMessages() {
+  errorMessage.style.display = 'none';
+  successMessage.style.display = 'none';
+}
+
+// Function to display error messages
+function displayErrorMessage(message, type = "error") {
+  errorMessage.textContent = message;
+  errorMessage.className = type; // Add a class for styling based on the message type
+  errorMessage.style.display = 'block';
+}
+
+// Function to display success messages
+function displaySuccessMessage(message, type = "success") {
+  successMessage.textContent = message;
+  successMessage.className = type; 
+  successMessage.style.display = 'block';
+}
 
 function checkDateInvalid(date) {
   // Check that date is not null.
@@ -124,18 +147,21 @@ function renderPastSessions() {
   // get the parsed string of sessions, or an empty array.
   const sessions = getAllStoredSessions();
 
-  // exit if there are no sessions
-  if (sessions.length === 0) {
-    return;
-  }
-
   // Clear the list of past sessions, since we're going to re-render it.
   pastSessionContainer.textContent = "";
 
   const pastSessionHeader = document.createElement("h2");
-  pastSessionHeader.textContent = "Past sessions";
+
 
   const pastSessionList = document.createElement("ul");
+
+  // Check if there are no sessions
+  if (sessions.length === 0) {
+    pastSessionContainer.appendChild(pastSessionHeader);
+    pastSessionContainer.appendChild(pastSessionList);
+    calculateTotalTime();
+    return;
+  }
 
   // Loop over all sessions and render them.
   sessions.forEach((session, index) => {
@@ -151,12 +177,21 @@ function renderPastSessions() {
       editSession(index);
     });
 
+    // Create a delete button for each session
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", () => {
+      deleteSession(index);
+    });
+
     sessionEl.appendChild(editButton);
+    sessionEl.appendChild(deleteButton);
     pastSessionList.appendChild(sessionEl);
   });
 
   pastSessionContainer.appendChild(pastSessionHeader);
   pastSessionContainer.appendChild(pastSessionList);
+  calculateTotalTime();
 }
 
 function editSession(index) {
@@ -186,6 +221,20 @@ function updateSession(index, date, startTime, endTime) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
 
   // Refresh the UI
+  renderPastSessions();
+}
+
+function deleteSession(index) {
+  // Get all sessions
+  const sessions = getAllStoredSessions();
+
+  // Remove the session at the specified index
+  sessions.splice(index, 1);
+
+  // Stoe the updated array back in the storage
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+
+  // refresh the ui
   renderPastSessions();
 }
 
@@ -236,7 +285,7 @@ function formatTime(timeString) {
 }
 
 function searchSessions(searchTerm) {
-  // Convert search term to the format used in stored sessions (YYYY-MM-DD)
+  // Convert search term to the format used in stored sessions (Y/M/D)
   const formattedSearchTerm = searchTerm.replace(/\//g, '-');
 
   // Get all sessions
@@ -245,7 +294,7 @@ function searchSessions(searchTerm) {
   // Filter sessions based on the search term
   const filteredSessions = sessions.filter(session => session.date.includes(formattedSearchTerm));
 
-  // Clear the list of pst sessions
+  // clear the list of past sessions
   pastSessionContainer.textContent = "";
 
   if (filteredSessions.length === 0) {
@@ -256,30 +305,59 @@ function searchSessions(searchTerm) {
   }
 
   const pastSessionHeader = document.createElement("h2");
+  
   pastSessionHeader.textContent = "Search results";
 
   const pastSessionList = document.createElement("ul");
 
-  // Loop over all filttered sessions and render them.
+
   filteredSessions.forEach((session, index) => {
     const sessionEl = document.createElement("li");
     sessionEl.textContent = `${formatDate(session.date)} from ${formatTime(
       session.startTime,
     )} to ${formatTime(session.endTime)} `;
 
-    // create an edit button for each session
+    // Creates an edit button for each session
     const editButton = document.createElement("button");
     editButton.textContent = "Edit";
     editButton.addEventListener("click", () => {
       editSession(index);
     });
 
+    // Creates a delete button for each session
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", () => {
+      deleteSession(index);
+    });
+
     sessionEl.appendChild(editButton);
+    sessionEl.appendChild(deleteButton);
     pastSessionList.appendChild(sessionEl);
   });
 
   pastSessionContainer.appendChild(pastSessionHeader);
   pastSessionContainer.appendChild(pastSessionList);
+  calculateTotalTime();
+}
+
+// Function to calculate the total time of all sessions
+function calculateTotalTime() {
+  const sessions = getAllStoredSessions();
+  let totalMinutes = 0;
+
+  sessions.forEach(session => {
+    // Use 1970-01-01 as a placeholder date to create time calculations
+    const startTime = new Date(`1970-01-01T${session.startTime}:00`);
+    const endTime = new Date(`1970-01-01T${session.endTime}:00`);
+    const duration = (endTime - startTime) / (1000 * 60); // duration in minutes
+    totalMinutes += duration;
+  });
+
+  const totalHours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+
+  totalTimeEl.textContent = `Total time: ${totalHours}h ${remainingMinutes}m`;
 }
 
 renderPastSessions();
